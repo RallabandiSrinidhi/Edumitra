@@ -1,20 +1,53 @@
 import os
-from fastapi import FastAPI, HTTPException, Depends
+from datetime import datetime, timedelta
+from typing import Optional
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
+from passlib.context import CryptContext
+from jose import JWTError, jwt
 
 load_dotenv()
 
-# --- 1. Database Configuration ---
+# --- Security Configuration ---
+SECRET_KEY = "edumithra_super_secret_jwt_key_change_me"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# --- Database Setup (SQLite & SQLAlchemy ORM) ---
 DATABASE_URL = "sqlite:///./edumithra.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Database Table Schema
+# --- Database Models (Epic 2 Database Integration) ---
+class UserModel(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+
+class CareerPathModel(Base):
+    __tablename__ = "career_paths"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True)
+    career_goal = Column(String)
+    skill_level = Column(String)
+
+class CurriculumModel(Base):
+    __tablename__ = "curriculums"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True)
+    career_goal = Column(String)
+    roadmap = Column(String)
+
 class QuizResultModel(Base):
     __tablename__ = "quiz_results"
     id = Column(Integer, primary_key=True, index=True)
@@ -23,7 +56,21 @@ class QuizResultModel(Base):
     score = Column(Integer)
     total = Column(Integer)
 
-# Create the database file and table automatically
+class ProgressTrackingModel(Base):
+    __tablename__ = "progress_tracking"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True)
+    topic_completed = Column(String)
+    streak_count = Column(Integer, default=1)
+    completion_percentage = Column(Float, default=0.0)
+
+class AchievementModel(Base):
+    __tablename__ = "achievements"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True)
+    title = Column(String)
+    description = Column(String)
+
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -33,67 +80,142 @@ def get_db():
     finally:
         db.close()
 
-# --- 2. FastAPI Setup ---
-app = FastAPI(title="EDUMITHRA AI Learning Platform API")
+# --- Helper Functions ---
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = db.query(UserModel).filter(UserModel.username == username).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+# --- FastAPI Initialization ---
+app = FastAPI(title="EDUMITHRA AI Learning Platform - Epic 2 Core")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Request Body Schemas
-class TopicRequest(BaseModel):
-    topic: str
-    difficulty: str = "beginner"
-
-class QuizRequest(BaseModel):
-    topic: str
-    num_questions: int = 3
-
-class ScoreSubmit(BaseModel):
+# --- Pydantic Request Schemas ---
+class UserRegister(BaseModel):
     username: str
-    topic: str
-    score: int
-    total: int
+    password: str
 
-# --- 3. Endpoints ---
-@app.get("/")
-def home():
-    return {"message": "Welcome to EDUMITHRA AI Learning Platform"}
+class CurriculumRequest(BaseModel):
+    career_goal: str
+    skill_level: str = "beginner"
+    timeline_weeks: int = 4
 
-@app.post("/explain")
-def explain_concept(req: TopicRequest):
-    prompt = f"Explain the concept of '{req.topic}' for a {req.difficulty} level student in simple, clear terms with bullet points."
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return {"explanation": completion.choices[0].message.content}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+class ProgressUpdate(BaseModel):
+    topic_completed: str
+    streak_count: int
+    completion_percentage: float
 
-@app.post("/generate-quiz")
-def generate_quiz(req: QuizRequest):
-    prompt = f"Generate {req.num_questions} multiple-choice quiz questions on '{req.topic}'. Include 4 options and mark the correct answer for each."
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return {"quiz": completion.choices[0].message.content}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/submit-score")
-def submit_score(score_data: ScoreSubmit, db: Session = Depends(get_db)):
-    new_result = QuizResultModel(
-        username=score_data.username,
-        topic=score_data.topic,
-        score=score_data.score,
-        total=score_data.total
-    )
-    db.add(new_result)
+# --- MODULE 1: USER MANAGEMENT SYSTEM ---
+@app.post("/register", tags=["1. User Management"])
+def register(user: UserRegister, db: Session = Depends(get_db)):
+    existing = db.query(UserModel).filter(UserModel.username == user.username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    new_user = UserModel(username=user.username, hashed_password=hash_password(user.password))
+    db.add(new_user)
     db.commit()
-    db.refresh(new_result)
-    return {"message": "Score saved successfully!", "data": new_result}
+    return {"message": "User registered successfully!"}
 
-@app.get("/scores")
-def get_scores(db: Session = Depends(get_db)):
-    return db.query(QuizResultModel).all()
+@app.post("/login", tags=["1. User Management"])
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(UserModel).filter(UserModel.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+    token = create_access_token(data={"sub": user.username})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.get("/users/me", tags=["1. User Management"])
+def profile(current_user: UserModel = Depends(get_current_user)):
+    return {"username": current_user.username, "status": "Active Session"}
+
+# --- MODULE 2: CURRICULUM GENERATION ---
+@app.post("/generate-curriculum", tags=["2. Curriculum Generation"])
+def generate_curriculum(
+    req: CurriculumRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    prompt = f"""
+    Act as an expert career mentor. Generate a structured {req.timeline_weeks}-week learning roadmap for a student aiming to become a '{req.career_goal}'.
+    Current Skill Level: {req.skill_level}.
+    Structure the response into:
+    - Phase 1: Core Fundamentals
+    - Phase 2: Intermediate Concepts & Tools
+    - Phase 3: Practical Projects & Portfolio
+    - Recommended Daily Habits & Educational Resources
+    """
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        roadmap_content = completion.choices[0].message.content
+        
+        # Save generated roadmap to database
+        new_curr = CurriculumModel(
+            username=current_user.username,
+            career_goal=req.career_goal,
+            roadmap=roadmap_content
+        )
+        db.add(new_curr)
+        db.commit()
+        
+        return {"career_goal": req.career_goal, "roadmap": roadmap_content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- MODULE 3: PROGRESS TRACKING SYSTEM ---
+@app.post("/progress/update", tags=["3. Progress Tracking"])
+def update_progress(
+    p_data: ProgressUpdate,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    new_progress = ProgressTrackingModel(
+        username=current_user.username,
+        topic_completed=p_data.topic_completed,
+        streak_count=p_data.streak_count,
+        completion_percentage=p_data.completion_percentage
+    )
+    db.add(new_progress)
+    db.commit()
+    return {"message": "Progress recorded successfully!", "data": p_data}
+
+@app.get("/progress/dashboard", tags=["3. Progress Tracking"])
+def get_user_progress(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    records = db.query(ProgressTrackingModel).filter(ProgressTrackingModel.username == current_user.username).all()
+    quizzes = db.query(QuizResultModel).filter(QuizResultModel.username == current_user.username).all()
+    return {
+        "username": current_user.username,
+        "completed_topics": [r.topic_completed for r in records],
+        "quiz_history": quizzes
+    }
