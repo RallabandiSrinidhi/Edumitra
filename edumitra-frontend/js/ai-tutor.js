@@ -3,8 +3,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatInput = document.getElementById("chat-input");
   const chatMessages = document.getElementById("chat-messages");
 
+  // Live Backend Address
+  const API_URL = "https://edumitra-backend-cado.onrender.com";
+
   if (chatForm) {
-    chatForm.addEventListener("submit", (e) => {
+    chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const message = chatInput.value.trim();
       if (!message) return;
@@ -13,14 +16,37 @@ document.addEventListener("DOMContentLoaded", () => {
       appendMessage("You", message, "rgba(255, 255, 255, 0.3)");
       chatInput.value = "";
 
-      // Simulate AI Tutor Response
-      setTimeout(() => {
+      try {
+        // Fetch AI response from your live backend
+        // Fetch AI response from your live backend
+        const response = await fetch(`${API_URL}/api/v1/tutor/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_query: message,
+            current_topic: "Python Fundamentals",
+            chat_history: []
+          }),
+        });
+
+        const data = await response.json();
+
+        // Display AI Tutor Response from API
         appendMessage(
           "AI Tutor",
-          "Great question! I'm here to help you master this concept step by step.",
+          data.response || data.reply || "I received your message!",
           "var(--accent-color)"
         );
-      }, 600);
+      } catch (error) {
+        console.error("Error communicating with backend:", error);
+        appendMessage(
+          "System",
+          "Error reaching backend server. Please try again later.",
+          "rgba(255, 0, 0, 0.3)"
+        );
+      }
     });
   }
 
@@ -31,7 +57,11 @@ document.addEventListener("DOMContentLoaded", () => {
     msgDiv.style.borderRadius = "8px";
     msgDiv.style.marginBottom = "8px";
     msgDiv.style.fontSize = "0.9rem";
-    msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+    
+    // Parse Markdown text into clean HTML
+    const formattedContent = typeof marked !== "undefined" ? marked.parse(text) : text;
+    
+    msgDiv.innerHTML = `<strong>${sender}:</strong> ${formattedContent}`;
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
