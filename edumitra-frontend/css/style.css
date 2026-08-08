@@ -54,3 +54,6 @@ body {
 .btn-primary:hover {
   background: var(--accent-hover);
 }
+#chat-messages div {
+  white-space: pre-wrap;
+}
