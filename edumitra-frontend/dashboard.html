@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EDUMITHRA - Student Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header>
+    <nav class="glass-card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+      <h2>EDUMITHRA Dashboard</h2>
+      <div style="display: flex; gap: 15px; align-items: center;">
+        <span>🔥 <strong>5 Day Streak</strong></span>
+        <a href="index.html" class="btn-primary" style="background: rgba(255, 255, 255, 0.2);">Logout</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Dashboard Grid Layout -->
+  <main style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+    
+    <!-- Progress Tracker -->
+    <div class="glass-card">
+      <h3>📈 Learning Progress</h3>
+      <p style="margin: 10px 0;">Python Fundamentals: <strong>75%</strong></p>
+      <div style="width: 100%; background: rgba(255,255,255,0.2); border-radius: 8px; height: 10px;">
+        <div style="width: 75%; background: var(--accent-color); height: 100%; border-radius: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- Quiz Performance -->
+    <div class="glass-card">
+      <h3>🎯 Quiz Performance</h3>
+      <p style="margin-top: 10px;">Average Score: <strong>88%</strong></p>
+      <p style="opacity: 0.8; font-size: 0.9rem;">Quizzes Completed: 12</p>
+    </div>
+
+    <!-- AI Insights & Recommendations -->
+    <div class="glass-card">
+      <h3>🤖 AI Tutor Insights</h3>
+      <p style="margin-top: 10px; font-size: 0.95rem;">"You're excelling at Data Structures! Focus next on Backend API Integration."</p>
+    </div>
+
+    <!-- Achievements -->
+    <div class="glass-card">
+      <h3>🏆 Badges & Achievements</h3>
+      <p style="margin-top: 10px;">🏅 Fast Learner | ⚡ 5-Day Streak</p>
+    </div>
+
+    <!-- Interactive AI Tutor Chat -->
+    <div class="glass-card" style="grid-column: 1 / -1;">
+      <h3>💬 Interactive AI Tutor Chat</h3>
+      <div id="chat-messages" style="height: 150px; overflow-y: auto; margin: 15px 0; padding: 10px; background: rgba(0,0,0,0.15); border-radius: 8px;">
+        <div style="background: var(--accent-color); padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 8px;">
+          <strong>AI Tutor:</strong> Hi there! Ask me anything about your current course material.
+        </div>
+      </div>
+      <form id="chat-form" style="display: flex; gap: 10px;">
+        <input type="text" id="chat-input" placeholder="Ask AI Tutor..." required style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.2); color: white; outline: none;">
+        <button type="submit" class="btn-primary">Send</button>
+      </form>
+    </div>
+
+  </main>
+
+  <script src="js/main.js"></script>
+  <script src="js/ai-tutor.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+/* Media Queries for Mobile and Tablet Devices */
+
+/* Tablets & Small Laptops (under 768px) */
+@media screen and (max-width: 768px) {
+  body {
+    padding: 12px;
+  }
+
+  .nav-container {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px !important;
+  }
+
+  .hero-content h1 {
+    font-size: 1.8rem !important;
+  }
+
+  .hero-content p {
+    font-size: 0.95rem !important;
+  }
+}
+
+/* Mobile Devices (under 480px) */
+@media screen and (max-width: 480px) {
+  .glass-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  #chat-form {
+    flex-direction: column;
+  }
+
+  #chat-form button {
+    width: 100%;
+  }
+
+  .btn-primary {
+    width: 100%;
+    text-align: center;
+  }
+}
